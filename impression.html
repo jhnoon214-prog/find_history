@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>활동 소감 남기기</title>
+    <!-- 파이어베이스 SDK (기존 버전과 동일) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <style>
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 550px;
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-size: 24px;
+            color: #2c3e50;
+            margin-top: 0;
+            text-align: center;
+        }
+        p.subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #444;
+            font-size: 14px;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus, textarea:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-submit:hover {
+            background-color: #219150;
+        }
+        /* 관리자 구역 스타일 */
+        .admin-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px dashed #eee;
+            text-align: center;
+        }
+        .admin-controls {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .admin-btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            color: white;
+            font-weight: bold;
+        }
+        .btn-draw { background-color: #e67e22; }
+        .btn-excel { background-color: #2980b9; }
+        .btn-reset { background-color: #e74c3c; }
+
+        /* 모달 팝업 */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .hidden { display: none !important; }
+        .modal-content {
+            background: white;
+            padding: 35px 25px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+/* 주머니 영역 스타일 */
+.pouch-wrapper {
+    text-align: center;
+    margin-top: 25px;
+}
+#pouch-img {
+    width: 90px;
+    height: auto;
+    transition: transform 0.2s ease;
+}
+
+/* 제출 시 주머니가 바운스되는 효과 */
+.pouch-bounce {
+    animation: pouchPop 0.4s ease-in-out;
+}
+@keyframes pouchPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.25) rotate(-5deg); }
+    100% { transform: scale(1); }
+}
+
+/* 주머니로 날아가는 쪽지 애니메이션 요소 */
+.flying-paper {
+    position: fixed;
+    z-index: 9999;
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    color: #856404;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-size: 14px;
+    font-weight: bold;
+    pointer-events: none;
+    transition: all 0.7s cubic-bezier(0.55, 0.085, 0.68, 0.53);
+    word-break: break-all;
+}
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>📝 오늘 활동 소감 한마디</h1>
+        <p class="subtitle">오늘 활동을 통해 느낀 점이나 생각했던 내용을 자유롭게 남겨주세요!</p>
+
+        <!-- 학생 소감 작성 양식 -->
+        <div class="form-group">
+            <label for="user-nickname">이름 또는 닉네임</label>
+            <input type="text" id="user-nickname" placeholder="예: 홍길동 (익명 가능)">
+        </div>
+
+        <div class="form-group">
+            <label for="user-impression">소감 내용</label>
+            <textarea id="user-impression" placeholder="느낀 점을 자유롭게 적어주세요..."></textarea>
+        </div>
+
+<!-- 소감 제출 버튼 & 주머니 구역 -->
+<button class="btn-submit" onclick="submitImpression()">✉️ 소감 제출하기</button>
+
+<div class="pouch-wrapper">
+<img src="주머니.png" id="pouch-img" alt="소감 주머니">
+    <p style="font-size: 12px; color: #888; margin-top: 5px;">제출한 소감은 주머니 속으로 들어갑니다!</p>
+</div>
+
+        <!-- 선생님/관리자 전용 구역 -->
+        <div class="admin-section">
+            <p style="font-size: 12px; color: #888; margin-bottom: 8px;">🔒 선생님 전용 메뉴</p>
+            <input type="password" id="admin-password" placeholder="비밀번호" style="width: 120px; padding: 6px; font-size: 12px; text-align: center; border: 1px solid #ccc; border-radius: 4px;">
+            <div class="admin-controls">
+                <button class="admin-btn btn-draw" onclick="checkAdminPassword('draw')">🎲 랜덤 소감 뽑기</button>
+                <button class="admin-btn btn-excel" onclick="checkAdminPassword('download')">💾 소감 엑셀 저장</button>
+                <button class="admin-btn btn-reset" onclick="checkAdminPassword('reset')">🗑️ 소감 초기화</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 랜덤 뽑기 팝업 창 -->
+    <div id="impression-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 style="color: #e67e22; margin-top: 0;">🎲 오늘의 랜덤 소감!</h2>
+            <p id="modal-author" style="font-weight: bold; color: #555; font-size: 16px;"></p>
+            <blockquote id="modal-content" style="font-size: 18px; line-height: 1.6; background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0; word-break: break-all; color: #2c3e50; border-left: 4px solid #e67e22; text-align: left;"></blockquote >
+            
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                <button onclick="drawRandomImpression()" style="padding: 10px 20px; background: #e67e22; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 하나 더 뽑기</button>
+                <button onclick="closeImpressionModal()" style="padding: 10px 20px; background: #7f8c8d; color: white; border: none; border-radius: 6px; cursor: pointer;">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. 파이어베이스 설정 (기존 테스트 웹사이트의 firebaseConfig 설정값 그대로 복사해서 넣으세요)
+        const firebaseConfig = {
+apiKey: "AIzaSyB1fOSdiXnZ5QtQD2CjfOtVkqMFiSiwWIA",
+            authDomain: "history-result.firebaseapp.com",
+            projectId: "history-result",
+            storageBucket: "history-result.firebasestorage.app",
+            messagingSenderId: "727740994298",
+            appId: "1:727740994298:web:b604238a6e829fa42f2f43",
+            measurementId: "G-MWWD1ZJZJ8"
+        };
+        
+        // 파이어베이스 초기화
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+
+        // 2. 소감 제출 함수
+       async function submitImpression() {
+    const nameInput = document.getElementById('user-nickname');
+    const contentInput = document.getElementById('user-impression');
+    const name = nameInput.value.trim() || "익명의 참가자";
+    const content = contentInput.value.trim();
+
+    if (!content) {
+        alert("소감을 입력해 주세요!");
+        return;
+    }
+
+    const pouchImg = document.getElementById('pouch-img');
+
+    // 1. 입력창과 주머니의 화면 위치 계산
+    const inputRect = contentInput.getBoundingClientRect();
+    const pouchRect = pouchImg.getBoundingClientRect();
+
+    // 2. 날아갈 쪽지 요소 생성
+    const flyingPaper = document.createElement('div');
+    flyingPaper.className = 'flying-paper';
+    flyingPaper.innerText = content.length > 25 ? content.substring(0, 25) + "..." : content;
+    flyingPaper.style.left = `${inputRect.left}px`;
+    flyingPaper.style.top = `${inputRect.top}px`;
+    flyingPaper.style.width = `${inputRect.width}px`;
+    flyingPaper.style.height = `${inputRect.height}px`;
+    document.body.appendChild(flyingPaper);
+
+// 3. 다음 프레임에서 주머니 위치로 이동하며 종이가 싹 접히는 모션
+    requestAnimationFrame(() => {
+        flyingPaper.style.transformOrigin = 'center top'; // 접히는 기준점
+        flyingPaper.style.left = `${pouchRect.left + pouchRect.width / 2 - 30}px`;
+        flyingPaper.style.top = `${pouchRect.top + 10}px`;
+        flyingPaper.style.width = '60px';
+        flyingPaper.style.height = '30px';
+        
+        // 💡 3D로 반 접히면서(rotateX) 위아래 폭이 납작해지는(scaleY) 접기 효과
+flyingPaper.style.transform = 'perspective(600deg) rotateX(140deg) rotateY(40deg) scale(0.05)';
+        flyingPaper.style.opacity = '0';
+    });
+
+    // 4. 애니메이션 종료 후 주머니 튕김(Bounce) & DB 저장
+    setTimeout(async () => {
+        flyingPaper.remove(); // 쪽지 삭제
+        pouchImg.classList.add('pouch-bounce'); // 주머니 바운스 효과
+
+        setTimeout(() => pouchImg.classList.remove('pouch-bounce'), 400);
+
+        try {
+            await db.collection("impressions").add({
+                name: name,
+                content: content,
+                createdAt: new Date().toLocaleString("ko-KR")
+            });
+            alert("소감이 주머니 속에 쏙 저장되었습니다! 👏");
+            contentInput.value = "";
+            nameInput.value = "";
+        } catch (error) {
+            console.error("소감 제출 오류:", error);
+            alert("제출 중 오류가 발생했습니다.");
+        }
+    }, 700);
+}
+        // 3. 관리자 비밀번호 검증
+        function checkAdminPassword(mode) {
+            const passwordInput = document.getElementById('admin-password').value.trim();
+            const CORRECT_PASSWORD = "0214"; 
+
+            if (passwordInput === CORRECT_PASSWORD) {
+                if(mode === 'draw') { drawRandomImpression(); }
+                else if(mode === 'download') { downloadImpressionsCSV(); }
+                else if(mode === 'reset') { resetImpressionsData(); }
+                document.getElementById('admin-password').value = ""; 
+            } else {
+                alert("비밀번호가 틀렸습니다.");
+                document.getElementById('admin-password').value = "";
+            }
+        }
+
+        // 4. 랜덤 소감 1개 뽑기
+        async function drawRandomImpression() {
+            try {
+                const snapshot = await db.collection("impressions").get();
+                if (snapshot.empty) {
+                    alert("아직 제출된 소감이 없습니다!");
+                    return;
+                }
+
+                const list = [];
+                snapshot.forEach(doc => list.push(doc.data()));
+
+                const randomIndex = Math.floor(Math.random() * list.length);
+                const selected = list[randomIndex];
+
+                document.getElementById('modal-author').innerText = `📌 작성자: ${selected.name}`;
+                document.getElementById('modal-content').innerText = `"${selected.content}"`;
+                document.getElementById('impression-modal').classList.remove('hidden');
+
+            } catch (error) {
+                console.error("소감 불러오기 오류:", error);
+                alert("소감을 가져오는 도중 오류가 발생했습니다.");
+            }
+        }
+
+        function closeImpressionModal() {
+            document.getElementById('impression-modal').classList.add('hidden');
+        }
+
+        // 5. 소감 전체 엑셀(CSV) 저장
+        async function downloadImpressionsCSV() {
+            try {
+                const snapshot = await db.collection("impressions").get();
+                if (snapshot.empty) {
+                    alert("저장할 소감 데이터가 없습니다.");
+                    return;
+                }
+
+                let csvContent = "\uFEFF작성시간,작성자,소감내용\n";
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const time = data.createdAt || "";
+                    const name = `"${(data.name || "").replace(/"/g, '""')}"`;
+                    const content = `"${(data.content || "").replace(/"/g, '""')}"`;
+
+                    csvContent += `${time},${name},${content}\n`;
+                });
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", `활동소감_모음_${new Date().toISOString().slice(0,10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+            } catch (error) {
+                console.error("엑셀 저장 오류:", error);
+                alert("소감 엑셀 저장 중 오류가 발생했습니다.");
+            }
+        }
+
+        // 6. 소감 전체 초기화
+        async function resetImpressionsData() {
+            const isConfirmed = confirm("⚠️ 제출된 모든 소감 데이터가 영구 삭제됩니다.\n정말로 초기화하시겠습니까?");
+            if (!isConfirmed) return;
+
+            try {
+                const snapshot = await db.collection("impressions").get();
+                if (snapshot.empty) {
+                    alert("삭제할 소감이 없습니다.");
+                    return;
+                }
+
+                const batch = db.batch();
+                snapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+
+                await batch.commit();
+                alert("모든 소감 데이터가 초기화되었습니다.");
+            } catch (error) {
+                console.error("초기화 오류:", error);
+                alert("초기화 중 오류가 발생했습니다.");
+            }
+        }
+    </script>
+</body>
+</html>
